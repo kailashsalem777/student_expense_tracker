@@ -15,16 +15,28 @@ if($_SERVER['REQUEST_METHOD']=='POST'){
     $error = "Password must be at least 6 characters.";
   } else {
     try {
+        // Auto fix table columns - error vara koodathu
+        try { $pdo->exec("ALTER TABLE users ADD COLUMN full_name VARCHAR(255)"); } catch(Exception $e){}
+        try { $pdo->exec("ALTER TABLE users ADD COLUMN username VARCHAR(255)"); } catch(Exception $e){}
+        try { $pdo->exec("ALTER TABLE users MODIFY password VARCHAR(255)"); } catch(Exception $e){}
+        try { $pdo->exec("ALTER TABLE users MODIFY full_name VARCHAR(255) NULL"); } catch(Exception $e){}
+        try { $pdo->exec("ALTER TABLE users MODIFY username VARCHAR(255) NULL"); } catch(Exception $e){}
+
         $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
         $stmt->execute([$email]);
         if($stmt->fetch()){
             $error = "An account with this email already exists.";
         } else {
             $hash = password_hash($pass, PASSWORD_DEFAULT);
-            try { $pdo->exec("ALTER TABLE users MODIFY password VARCHAR(255)"); } catch(Exception $e){}
-            $stmt = $pdo->prepare("INSERT INTO users (username, email, password) VALUES (?, ?, ?)");
-            $stmt->execute([$name, $email, $hash]);
-            try { $pdo->prepare("INSERT INTO expense_users (name, email, password) VALUES (?, ?, ?)")->execute([$name, $email, $hash]); } catch(Exception $e){}
+            // Rendukum same name insert panrom - full_name & username
+            $stmt = $pdo->prepare("INSERT INTO users (full_name, username, email, password) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$name, $name, $email, $hash]);
+
+            try { 
+                $pdo->exec("CREATE TABLE IF NOT EXISTS expense_users (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), email VARCHAR(255), password VARCHAR(255))");
+                $pdo->prepare("INSERT INTO expense_users (name, email, password) VALUES (?, ?, ?)")->execute([$name, $email, $hash]); 
+            } catch(Exception $e){}
+
             header('Location: login.php?msg=registered'); exit;
         }
     } catch(Exception $e){
@@ -82,7 +94,7 @@ body{background:#0a1413;min-height:100vh;display:flex;color:#e6f0ef}
       <div class="point"><i>✓</i> Private and secure by design</div>
     </div>
   </div>
-  <div class="copy">© 2026 Student Expense Tracker • Built for Students</div>
+  <div class="copy">©️ 2026 Student Expense Tracker • Built for Students</div>
 </div>
 
 <div class="right">
@@ -94,7 +106,7 @@ body{background:#0a1413;min-height:100vh;display:flex;color:#e6f0ef}
 
     <form method="POST" autocomplete="off">
       <label class="lab">Full Name</label>
-      <input class="inp" type="text" name="name" required placeholder="e.g. Jackson Durai" value="<?= htmlspecialchars($_POST['name']??'')?>">
+      <input class="inp" type="text" name="name" required placeholder="e.g. your name" value="<?= htmlspecialchars($_POST['name']??'')?>">
       
       <label class="lab">Email Address</label>
       <input class="inp" type="email" name="email" required placeholder="you@college.edu" value="<?= htmlspecialchars($_POST['email']??'')?>">
